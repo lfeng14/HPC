@@ -1,5 +1,3 @@
-我直接按你给的这段文字，**不搜索、简要解析**：
-
 这段讲的是 **Arm 的可伸缩向量扩展 SVE**，核心是为高性能计算做优化：
 
 1. **核心特点**
@@ -21,3 +19,6 @@
 
 简单总结：
 **SVE 就是 Arm 为了让同一份代码能在宽窄不同的向量硬件上都跑快，而设计的一套可伸缩、高性能 SIMD 向量指令体系。**
+
+#### further reading
+- https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
