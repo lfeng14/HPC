@@ -87,3 +87,7 @@ C0 = A0 \cdot B_{00} + A1 \cdot B_{10} + A2 \cdot B_{20} + A3 \cdot B_{30}
 
 ### 总结
 这段代码之所以能正确计算矩阵乘法，是因为它将矩阵乘法的**内积视角**转换为了**外积视角**：通过将 B 的每一列元素作为标量系数，对 A 的各列进行线性组合，从而一次性得到 C 的一列。这种“列向量乘标量累加”的模式天然适合 SIMD 向量化，是手写优化矩阵乘法的常用技巧。
+
+
+#### further reading
+- https://developer.arm.com/documentation/102131/0100/Part-Four---Migrate-your-Neon-code-to-SVE
