@@ -73,3 +73,4 @@ SVE 的一个核心目标是：
 
 #### further reading
 - https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
+- file:///D:/download/SVE-SVE2-programming-examples-REL-01.2.pdf
