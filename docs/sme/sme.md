@@ -47,3 +47,47 @@
 ---
 
 准备主要突出 SME 的哪个方向呢？是偏向后端的代码生成机制（Code Generation & GlobalISel），还是偏向在算子层面的性能压榨（HPC Tuning）？
+
+---
+
+如果偏向 **HPC Tuning（算子级性能优化）**，面试官的火力会集中在你对**内存层次结构、计算密度（Roofline 模型）、流水线隐藏**的理解上。
+
+针对 HPC Tuning，你需要向面试官展示你掌握了以下几个核心的“杀手锏”知识点：
+
+### 1. 核心战术：打破内存墙（Memory Wall）与 MOPA 机制
+在 HPC 面试中，面试官最关心的是你如何处理 Memory Bound（访存瓶颈）。
+*   **外积的降维打击**：你需要清晰地解释，传统的内积（Dot Product，如普通的 SVE 乘加）每计算 1 个结果需要读取 2 个元素；而 SME 的 **MOPA（Matrix Outer Product and Accumulate）** 机制，一次读取 $2 \times SVL$ 个元素，就能在 ZA 阵列中完成 $SVL \times SVL$ 次乘加！ 这将“计算/访存比”提升了一个数量级，直接把算子从 Memory Bound 拉向 Compute Bound。
+*   **ZA 阵列作为超大 Cache**：展示你把 ZA 不仅仅看作寄存器，而是看作 L0 Cache。在最内层循环中，累加结果一直驻留在 ZA 中不写回内存，直到这一块（Tile）完全计算完毕才写回。
+
+### 2. 微内核设计：循环分块（Loop Tiling / Register Blocking）
+如果你优化过矩阵乘法（GEMM）或 Attention 算子，绝对绕不开这个。
+*   **分块策略**：面对大矩阵，你如何基于当前硬件的 SVL（向量长度）来切分矩阵？ 你需要讲出如何将大矩阵划分为适合装入 ZA 阵列的 $SVL \times SVL$ 微内核（Micro-kernel）。
+*   **边缘处理（Fringe/Tail Handling）**：当矩阵维度不是 SVL 的整数倍时，你是怎么处理的？（使用 SME/SVE 的 Predication / 掩码机制 `svwhilelt`，而不是低效的标量扫尾）。
+
+### 3. 数据布局与访存模式优化（Data Layout & Access Patterns）
+算子性能往往死在不合理的访存上。
+*   **连续访存**：SME 极度依赖连续的内存加载。你会如何调整数据排布（比如从 NCHW 转 NHWC，或者做 Matrix Interleaving/Packing），使得在加载向量到 Z 寄存器时，能使用最高效的 `LD1W` / `LD1D`，避免昂贵的 Scatter/Gather（离散访存）。
+*   **软流水（Software Pipelining）**：在 MOPA 计算的同时，如何利用预取指令（`PRFM`）或者双缓冲（Double Buffering），提前把下一个循环的向量数据加载进 L1 Cache 或闲置的 Z 寄存器中，掩盖内存延迟。
+
+### 4. 状态切换代价的极致控制
+这是体现你“懂行”的关键细节。
+*   **SMSTART/SMSTOP 的代价**：进入和退出 Streaming Mode 是有几百个 cycle 甚至更长延迟的（涉及到保存/清空传统寄存器状态）。
+*   **优化思路**：向面试官证明你懂得**“状态提升（Hoisting）”**。绝对不能在内层循环里频繁开关 SME 模式，必须在算子最外层统一开启，算完后再统一关闭。同样的道理适用于清零指令 `svzero_za`。
+
+---
+
+### 📚 HPC 面试前必读的“武功秘籍”
+
+对于这个方向，你需要看的文档和后端的不同：
+
+1.  **ARM Software Optimization Guide (SOG)** 针对特定微架构（如 Neoverse V2 或 Cortex-X4）。
+    *   *关注点*：找到 SME 相关的指令延迟（Latency）和吞吐量（Throughput）。明确一条 `FMOPA` 指令需要几个 Cycle，发射端口（Issue Ports）是怎么分配的。
+2.  **OpenBLAS 或 BLIS 的源码（针对 AArch64/SME 分支）**
+    *   *关注点*：看业界顶尖的 HPC 工程师是如何手写 SME 汇编/Intrinsics 的。去搜里面的 `dgemm_kernel` （双精度矩阵乘法微内核），那就是标准的答案。
+3.  **BLIS 框架的论文 (Anatomy of High-Performance Matrix Multiplication)**
+    *   *关注点*：这篇论文虽然老，但把为什么要进行寄存器分块（Register Block）、L1/L2 Cache 分块讲得极其透彻，这套理论原封不动适用于 SME 的 ZA 阵列优化。
+
+**实战话术建议 (STAR 原则)**：
+“在优化 AlphaFold3 的 XX 算子时，我发现原始代码存在严重的访存瓶颈。我通过引入 SME 的 MOPA 指令，重新设计了计算的微内核，将 $M \times N$ 的计算 Tiling 到 $SVL \times SVL$ 的 ZA 阵列中。同时优化了最内层的数据预取，最终将算子的计算利用率（FLOPs Utilization）从 XX% 提升到了 YY%。”
+
+结合你之前在 AlphaFold3 上的经验，你在优化算子时，主要是遇到了计算单元利用率低（如一直在等内存），还是指令调度流水线导致的卡顿问题？
